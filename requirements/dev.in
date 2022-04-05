@@ -1,0 +1,9 @@
+-c prod.txt
+kaggle
+ipykernel
+pandas
+numpy
+matplotlib
+seaborn
+missingno
+scipy
