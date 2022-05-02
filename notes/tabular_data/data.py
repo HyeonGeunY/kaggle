@@ -1,13 +1,21 @@
 import missingno as msno
 import pandas as pd
 
-
-def visualize_features(df: pd.DataFrame, start_idx: int = 0, end_idx: int = 0):
+# null
+def visualize_null_features(df: pd.DataFrame, start_idx: int = 0, end_idx: int = 0):
 
     if end_idx:
         msno.matrix(df=df.iloc[:, start_idx:end_idx], figsize=(20, 14), color=(0.42, 0.1, 0.05))
     else:
         msno.matrix(df=df.iloc[:, start_idx], figsize=(20, 14), color=(0.42, 0.1, 0.05))
+
+
+def visualize_null_features_bar(df: pd.DataFrame, start_idx: int = 0, end_idx: int = 0):
+
+    if end_idx:
+        msno.bar(df=df.iloc[:, start_idx:end_idx], figsize=(20, 14), color=(0.42, 0.1, 0.05))
+    else:
+        msno.bar(df=df.iloc[:, start_idx], figsize=(20, 14), color=(0.42, 0.1, 0.05))
 
 
 def checking_percent_of_null(df: pd.DataFrame, stage: str = "train"):
@@ -19,8 +27,6 @@ def checking_percent_of_null(df: pd.DataFrame, stage: str = "train"):
 
 
 # meta data
-
-
 def get_meta_data(df: pd.DataFrame):
     data = []
     for f in df.columns:
@@ -36,7 +42,7 @@ def get_meta_data(df: pd.DataFrame):
         elif f in ["CryoSleep", "VIP"]:
             level = "binary"
         elif f in ["RoomService", "FoodCourt", "ShoppingMall", "Spa", "VRDeck"]:
-            level = "comtinous"
+            level = "continous"
         elif f in ["Age"]:
             level = "discrete"
 
@@ -57,12 +63,64 @@ def get_meta_data(df: pd.DataFrame):
     return meta
 
 
-def add_row_to_metadata(meta: pd.DataFrame, info_list: list, index: str):
-    meta = pd.concat(
-        [
-            meta,
-            pd.DataFrame([info_list], columns=["role", "level", "keep", "dtype"], index=[index]),
-        ],
-        axis=0,
-    )
+def add_row_to_metadata(meta: pd.DataFrame, df, level: List[str], role="input", keep=True):
+    """
+    add row to meta data
+
+    Parameters:
+    meta(pd.DataFrame): meta data
+    df(pd.Series or pd.DataFrame): df added to meta
+
+    Returns:
+    meta
+    """
+    level_group = ["ordinal", "nominal", "continuous", "binary"]
+
+    if type(df) == pd.core.series.Series:
+        if level not in level_group:
+            raise f"level should be in [ordinal, nominal, continuous, binary]"
+
+        name = df.name
+        if name in meta.index:
+            print(f"{name} already exists")
+            return meta
+
+        dtype = df.dtype
+        meta = pd.concat(
+            [
+                meta,
+                pd.DataFrame(
+                    [[role, level, keep, dtype]],
+                    columns=["role", "level", "keep", "dtype"],
+                    index=[name],
+                ),
+            ],
+            axis=0,
+        )
+
+    if type(df) == pd.core.frame.DataFrame:
+        columns = df.columns
+
+        for c, l in zip(columns, level):
+            if l not in level_group:
+                raise f"level should be in [ordinal, nominal, continuous, binary]"
+
+            name = df[c].name
+            if name in meta.index:
+                print(f"{name} already exists")
+                continue
+
+            dtype = df[c].dtype
+            meta = pd.concat(
+                [
+                    meta,
+                    pd.DataFrame(
+                        [[role, l, keep, dtype]],
+                        columns=["role", "level", "keep", "dtype"],
+                        index=[name],
+                    ),
+                ],
+                axis=0,
+            )
+
     return meta

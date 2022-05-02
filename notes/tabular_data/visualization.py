@@ -64,4 +64,51 @@ def checking_binary_target_label_distribution(df: pd.DataFrame):
     ax[1].set_title('Count plot - Transported')
     plt.show()
     
-    return 
+    return
+
+
+def count_plot(df: pd.DataFrame, feature: str, hue: str):
+
+    y_position = 1.02
+    f, ax = plt.subplots(1, 2, figsize=(30, 8))
+    df[feature].value_counts().plot.bar(color=['#CD7F32','#FFDF00'], ax=ax[0]) # color=['#CD7F32','#FFDF00','#D3D3D3']
+    ax[0].set_title(f"Number of samples by {feature}", y=y_position)
+    ax[0].set_ylabel("Count")
+    sns.countplot(feature, hue=hue, data=df, ax=ax[1])
+    ax[1].set_title(f"{feature} {hue} vs not", y=y_position)
+    plt.subplots_adjust(wspace=0.3, hspace=0.5)
+
+    # if need more col => add like below
+    # sns.countplot("HomePlanet", hue="CryoSleep", data=df_train, ax=ax[2])
+    # ax[2].set_title("CryoSleep by HomePlanet", y=y_position)
+    # plt.subplots_adjust(wspace=0.3, hspace=0.5)
+    plt.show()
+
+
+def distplot_binary(df: pd.DataFrame, feature: str, hue: str):
+    fig, ax = plt.subplots(1, 1, figsize=(9, 5))
+    sns.distplot(df[df[hue] == 0][feature], ax=ax)
+    sns.distplot(df[df[hue] == 1][feature], ax=ax)
+    plt.legend([f'{hue} == 0', f'{hue} == 1'])
+    plt.title(f"{feature} vs {hue}")
+    plt.show()
+
+
+def factorplot(df: pd.DataFrame, feature: str, target: str, hue: str = None, col: str = None):
+
+    if hue and col:
+        sns.factorplot(feature, target, hue=hue, col=col, data=df, 
+                size=6, aspect=1.5)
+        plt.title(f"{feature} & {hue} vs {target}")
+    elif hue and (not col):
+        sns.factorplot(feature, target, hue=hue, data=df, 
+                size=6, aspect=1.5)
+        plt.title(f"{feature} & {hue} vs {target}")
+    elif (not hue) and col:
+        sns.factorplot(feature, target, col=col, data=df, 
+                size=6, aspect=1.5)
+        plt.title(f"{feature} & {hue} vs {target}")
+    else:
+        sns.factorplot(feature, target, data=df, 
+                size=6, aspect=1.5)
+        plt.title(f"{feature} vs {target}")
