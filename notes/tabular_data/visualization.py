@@ -3,6 +3,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from typing import List
 
+# bar
 def plot_bar_sns(df: pd.dataFrame, x_feature: str, y_feature: str):
     plt.figure()
     fig, ax = plt.subplots(figsize=(20,10))
@@ -11,8 +12,32 @@ def plot_bar_sns(df: pd.dataFrame, x_feature: str, y_feature: str):
     plt.ylabel(y_feature, fontsize=18)
     plt.xlabel(x_feature, fontsize=18)
     plt.tick_params(axis='both', which='major', labelsize=18)
-    plt.show();
+    plt.show()
+
+def plot_bar_along_columns(df: pd.DataFrame, x: str = None, y: List[str] = None, title: str = "set_title"):
     
+    f, ax = plt.subplots(1, 1, figsize=(20, 8))
+
+    if not x:
+        df.plot(y=y, kind="bar", ax=ax)
+        plt.title(title, fontsize=20)
+        
+    else:
+        df.plot(x=x, y=y, kind="bar", ax=ax)
+        plt.title(title, fontsize=20)
+    
+    ## 눈금 글자 크기 지정
+    plt.tick_params(axis='x', direction='in', length=3, pad=6, rotation=-90, labelsize=20, top=True)
+    plt.tick_params(axis='y', direction='in', length=3, pad=6, labelsize=20, top=True)
+    plt.grid()
+    
+    ## legend 크기 지정 (글꼴 그키 지정)
+    params = {'legend.fontsize': 20,
+          'legend.handlelength': 2}
+
+    plt.rcParams.update(params)
+    plt.savefig(title, format="png")
+        
     
 def corr_heatmap(df: pd.DataFrame, features: List[str] = None):
     
