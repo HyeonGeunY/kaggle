@@ -1,3 +1,5 @@
+import IPython.display as ipd
+
 class AudioP():
     def __init__(self):
         self.root_dir = ROOTDIR
@@ -9,5 +11,3 @@ class AudioP():
         print(f"{key}: {value}")
         return ipd.display(ipd.Audio(audio)) # ipd.Audio(audio)
     
-test_d = AudioP()
-birds = list(train_df.primary_label.unique()[0:6])

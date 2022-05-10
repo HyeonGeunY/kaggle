@@ -7,6 +7,7 @@ import torch
 import collections import Counter
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import Dataset, DataLoader
+import ast
 
 from typing import List
 
@@ -23,6 +24,7 @@ class Dataviz():
         # edit metadata
         self.meta = pd.read_csv(fr"{self.root_dir}/train_metadata.csv")
         self.meta['type'] = self.meta['type'].apply(lambda x : ast.literal_eval(x))
+        self.meta["full_path"] = self.root_dir + '/' + 'train_audio' + '/' + self.meta['filename']
         #
         self.sample_rate = sample_rate
         self.n_fft = n_fft
