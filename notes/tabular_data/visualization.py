@@ -10,7 +10,7 @@ py.init_notebook_mode(connected=True)
 import plotly.graph_objs as go
 import plotly.tools as tls
 
-# barplot
+# barplot 
 
 def plot_bar_sns(df: pd.dataFrame, x_feature: str, y_feature: str):
     plt.figure()
@@ -158,7 +158,7 @@ def checking_binary_target_label_distribution(df: pd.DataFrame):
     ax[1].set_title("Count plot - Transported")
     plt.show()
 
-    return
+    return 
 
 
 def count_plot(df: pd.DataFrame, feature: str, hue: str):
