@@ -17,9 +17,8 @@ import torchaudio.transforms as T
 
 from birdclef.data.base_data_module import BaseDataModule, load_and_print_info
 from birdclef.data.util import BaseDataset, split_dataset
-from birdclef.util import normalize_std
+from birdclef.util import normalize_std, get_split_by_bird, copy_split_audio
 
-from sklearn.model_selection import StratifiedKFold
 
 DOWNLOADED_DIRNAME = BaseDataModule.data_dirname() / "birdclef-2022"
 META_DATA_FILENAME = DOWNLOADED_DIRNAME / "train_metadata.csv"
@@ -133,6 +132,16 @@ class BirdClef2022(BaseDataModule):
         if os.path.exists(ESSENTIALS_FILENAME):
             return
 
+        meta_train, meta_test = get_split_by_bird(self.meta_df)
+        
+        traintest_filename = {"trainval": list(meta_train.filename), "test": list(meta_test.filename)}
+
+        with open(SPLIT_FILENAME, "w") as f:
+            json.dump(traintest_filename, f)
+            
+        for meta, stage in zip([meta_train, meta_test], ["trainval", "test"]):
+            copy_split_audio(meta, root_dir=DOWNLOADED_DIRNAME, stage=stage)
+        
         for stage in ["trainval", "test"]:
             _save_mel_labels_essentials(
                 self.meta_df[self.meta_df.filename.isin(self.split_names[stage])],
