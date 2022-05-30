@@ -16,7 +16,11 @@ import torch
 import torchaudio
 import torchaudio.transforms as T
 
-from birdclef.data.base_data_module import BaseDataModule, load_and_print_info, check_data_downloaded
+from birdclef.data.base_data_module import (
+    BaseDataModule,
+    load_and_print_info,
+    check_data_downloaded,
+)
 from birdclef.data.util import BaseDataset, split_dataset
 from birdclef.util import normalize_std, get_split_by_bird, copy_split_audio
 
@@ -29,7 +33,9 @@ AUDIO_DIR = DOWNLOADED_DIRNAME / "train_audio"
 SPLIT_FILENAME = DOWNLOADED_DIRNAME / "traintest_filename.json"
 
 PROCESSED_DATA_DIRNAME = BaseDataModule.data_dirname() / "processed" / "birdclef2022"
-ESSENTIALS_FILENAME = BaseDataModule.data_dirname() / "processed" / "birdclef2022" /"birdclef2022.json"
+ESSENTIALS_FILENAME = (
+    BaseDataModule.data_dirname() / "processed" / "birdclef2022" / "birdclef2022.json"
+)
 
 
 SAMPLE_RATE = 32000
@@ -57,7 +63,7 @@ class BirdClef2022(BaseDataModule):
         super().__init__(args)
         self.meta_df = pd.read_csv(META_DATA_FILENAME)
         self.meta_df["filepath"] = str(AUDIO_DIR) + "/" + self.meta_df["filename"]
-        
+
         self.n_mels = self.args.get("n_mels", N_MELS)
         self.n_fft = self.args.get("n_fft", N_FFT)
         self.sr = self.args.get("sample_rate", SAMPLE_RATE)
@@ -75,7 +81,7 @@ class BirdClef2022(BaseDataModule):
 
         with open(ESSENTIALS_FILENAME) as f:
             essentials = json.load(f)
-    
+
         with open(SPLIT_FILENAME) as f:
             self.split_names = json.load(f)
 
@@ -85,7 +91,9 @@ class BirdClef2022(BaseDataModule):
             + "trainval"
             + "/"
             + pd.Series(
-                np.arange(len(torch.load(PROCESSED_DATA_DIRNAME / "trainval" / "label_list.pt"))).astype(str)
+                np.arange(
+                    len(torch.load(PROCESSED_DATA_DIRNAME / "trainval" / "label_list.pt"))
+                ).astype(str)
             )
             + ".pt"
         )
@@ -95,7 +103,9 @@ class BirdClef2022(BaseDataModule):
             + "test"
             + "/"
             + pd.Series(
-                np.arange(len(torch.load(PROCESSED_DATA_DIRNAME / "test" / "label_list.pt"))).astype(str)
+                np.arange(
+                    len(torch.load(PROCESSED_DATA_DIRNAME / "test" / "label_list.pt"))
+                ).astype(str)
             )
             + ".pt"
         )
@@ -132,28 +142,31 @@ class BirdClef2022(BaseDataModule):
         return mel_converter
 
     def prepare_data(self):
-        
+
         if not os.path.exists(ZIPFILE_PATH):
             metadata = toml.load(METADATA_FILENAME)
             check_data_downloaded(metadata, BaseDataModule.data_dirname())
-            
-        
+            return
+
         if os.path.exists(ESSENTIALS_FILENAME) and os.path.exists(SPLIT_FILENAME):
             return
 
         meta_train, meta_test = get_split_by_bird(self.meta_df)
-        
-        traintest_filename = {"trainval": list(meta_train.filename), "test": list(meta_test.filename)}
+
+        traintest_filename = {
+            "trainval": list(meta_train.filename),
+            "test": list(meta_test.filename),
+        }
 
         with open(SPLIT_FILENAME, "w") as f:
             json.dump(traintest_filename, f)
-            
+
         with open(SPLIT_FILENAME) as f:
             self.split_names = json.load(f)
-            
+
         for meta, stage in zip([meta_train, meta_test], ["trainval", "test"]):
             copy_split_audio(meta, root_dir=str(DOWNLOADED_DIRNAME), stage=stage)
-        
+
         for stage in ["trainval", "test"]:
             _save_mel_labels_essentials(
                 self.meta_df[self.meta_df.filename.isin(self.split_names[stage])],
@@ -316,7 +329,7 @@ def _audio_to_mel_label(
 
         if not os.path.exists(PROCESSED_DATA_DIRNAME / stage):
             os.makedirs(PROCESSED_DATA_DIRNAME / stage)
-            
+
         torch.save(log_melspec, PROCESSED_DATA_DIRNAME / stage / (str(data_index) + ".pt"))
         label_list.append(label_file_all)
         data_index += 1
