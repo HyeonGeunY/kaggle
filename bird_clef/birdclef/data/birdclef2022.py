@@ -29,7 +29,7 @@ AUDIO_DIR = DOWNLOADED_DIRNAME / "train_audio"
 SPLIT_FILENAME = DOWNLOADED_DIRNAME / "traintest_filename.json"
 
 PROCESSED_DATA_DIRNAME = BaseDataModule.data_dirname() / "processed" / "birdclef2022"
-ESSENTIALS_FILENAME = BaseDataModule.data_dirname() / "processed" / "birdclef2022.json"
+ESSENTIALS_FILENAME = BaseDataModule.data_dirname() / "processed" / "birdclef2022" /"birdclef2022.json"
 
 
 SAMPLE_RATE = 32000
