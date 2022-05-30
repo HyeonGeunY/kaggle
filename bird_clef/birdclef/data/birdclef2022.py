@@ -54,10 +54,7 @@ class BirdClef2022(BaseDataModule):
         super().__init__(args)
         self.meta_df = pd.read_csv(META_DATA_FILENAME)
         self.meta_df["filepath"] = str(AUDIO_DIR) + "/" + self.meta_df["filename"]
-
-        with open(SPLIT_FILENAME) as f:
-            self.split_names = json.load(f)
-
+        
         self.n_mels = self.args.get("n_mels", N_MELS)
         self.n_fft = self.args.get("n_fft", N_FFT)
         self.sr = self.args.get("sample_rate", SAMPLE_RATE)
@@ -75,6 +72,9 @@ class BirdClef2022(BaseDataModule):
 
         with open(ESSENTIALS_FILENAME) as f:
             essentials = json.load(f)
+    
+        with open(SPLIT_FILENAME) as f:
+            self.split_names = json.load(f)
 
         self.processed_filepath_trainval = (
             str(PROCESSED_DATA_DIRNAME)
@@ -129,7 +129,7 @@ class BirdClef2022(BaseDataModule):
         return mel_converter
 
     def prepare_data(self):
-        if os.path.exists(ESSENTIALS_FILENAME):
+        if os.path.exists(ESSENTIALS_FILENAME) and os.path.exists(SPLIT_FILENAME):
             return
 
         meta_train, meta_test = get_split_by_bird(self.meta_df)
@@ -139,8 +139,11 @@ class BirdClef2022(BaseDataModule):
         with open(SPLIT_FILENAME, "w") as f:
             json.dump(traintest_filename, f)
             
+        with open(SPLIT_FILENAME) as f:
+            self.split_names = json.load(f)
+            
         for meta, stage in zip([meta_train, meta_test], ["trainval", "test"]):
-            copy_split_audio(meta, root_dir=DOWNLOADED_DIRNAME, stage=stage)
+            copy_split_audio(meta, root_dir=str(DOWNLOADED_DIRNAME), stage=stage)
         
         for stage in ["trainval", "test"]:
             _save_mel_labels_essentials(
