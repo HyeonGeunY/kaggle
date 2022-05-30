@@ -10,16 +10,19 @@ import pandas as pd
 import os
 
 import tqdm
+import toml
 
 import torch
 import torchaudio
 import torchaudio.transforms as T
 
-from birdclef.data.base_data_module import BaseDataModule, load_and_print_info
+from birdclef.data.base_data_module import BaseDataModule, load_and_print_info, check_data_downloaded
 from birdclef.data.util import BaseDataset, split_dataset
 from birdclef.util import normalize_std, get_split_by_bird, copy_split_audio
 
 
+METADATA_FILENAME = "/home/skang/Documents/kaggle/bird_clef/data_raw/metadata.toml"
+ZIPFILE_PATH = BaseDataModule.data_dirname() / "birdclef-2022.zip"
 DOWNLOADED_DIRNAME = BaseDataModule.data_dirname() / "birdclef-2022"
 META_DATA_FILENAME = DOWNLOADED_DIRNAME / "train_metadata.csv"
 AUDIO_DIR = DOWNLOADED_DIRNAME / "train_audio"
@@ -129,6 +132,12 @@ class BirdClef2022(BaseDataModule):
         return mel_converter
 
     def prepare_data(self):
+        
+        if not os.path.exists(ZIPFILE_PATH):
+            metadata = toml.load(METADATA_FILENAME)
+            check_data_downloaded(metadata, BaseDataModule.data_dirname())
+            
+        
         if os.path.exists(ESSENTIALS_FILENAME) and os.path.exists(SPLIT_FILENAME):
             return
 

@@ -1,3 +1,2 @@
 url = "https://www.kaggle.com/competitions/birdclef-2022/data"
-filename = 'birdclef.zip'
-test_ids = []
+filename = 'birdclef-2022.zip'

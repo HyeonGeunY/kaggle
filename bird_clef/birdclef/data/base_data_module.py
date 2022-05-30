@@ -33,7 +33,7 @@ def check_data_downloaded(metadata: Dict, dl_dirname: Path) -> Path:
         return filename
 
     print("No data exists")
-    print(f"Download data from {metadata['url']}에 to {filename}")
+    print(f"Download data from {metadata['url']} to {filename}")
 
     return filename
 
