@@ -8,11 +8,8 @@ import torch.nn.functional as F
 
 CONV_DIM = 64
 FC_DIM = 128
-H_SPEC = 256
+H_SPEC = 128
 W_SPEC = 313
-
-
-
 
 class ConvBlock(nn.Module):
     """
@@ -22,8 +19,8 @@ class ConvBlock(nn.Module):
 
     def __init__(self, input_channels, output_channels):
         super().__init__()
-        self.conv = nn.Con2d(input_channels, output_channels, kernel_size=3, stride=1, padding=1)
-        self.relu = nn.ReLu()
+        self.conv = nn.Conv2d(input_channels, output_channels, kernel_size=3, stride=1, padding=1)
+        self.relu = nn.ReLU()
 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -43,12 +40,11 @@ class ConvBlock(nn.Module):
 
 class SimpleCNN(nn.Module):
 
-
     def __init__(self, data_config: Dict[str, Any], args: argparse.Namespace = None) -> None:
-
         super().__init__()
         self.args = vars(args) if args is not None else {}
 
+        self.data_config = data_config
         self.input_dims = data_config["input_dims"]  # (C, H, W)
         self.num_classes = len(data_config["mapping"])
 
@@ -62,7 +58,7 @@ class SimpleCNN(nn.Module):
 
         o_h, o_w = H_SPEC // 2, W_SPEC // 2
 
-        fc_input_dim = int(o_h * o_w * conv_dim)
+        fc_input_dim = int(o_h * o_w * conv_dim * 2)
         self.fc1 = nn.Linear(fc_input_dim, fc_dim)
         self.fc2 = nn.Linear(fc_dim, self.num_classes)
         
@@ -84,6 +80,7 @@ class SimpleCNN(nn.Module):
         x = self.conv2(x)
         x = self.max_pool(x)
         x = self.dropout(x)
+        x = torch.flatten(x, 1)
         x = self.fc1(x)
         x = F.relu(x)
         x = self.fc2(x)

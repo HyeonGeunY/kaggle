@@ -3,3 +3,4 @@ input/
 **/wandb
 **/*.bin
 **/__pycache__
+venv

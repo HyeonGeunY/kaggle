@@ -1,4 +1,3 @@
-from fileinput import filename
 import sys
 
 import argparse
@@ -16,6 +15,8 @@ import torch
 import torchaudio
 import torchaudio.transforms as T
 
+import librosa.feature as F
+
 from birdclef.data.base_data_module import (
     BaseDataModule,
     load_and_print_info,
@@ -23,6 +24,7 @@ from birdclef.data.base_data_module import (
 )
 from birdclef.data.util import BaseDataset, split_dataset
 from birdclef.util import normalize_std, get_split_by_bird, copy_split_audio
+from birdclef.data.augmentation_v1 import Config, waveform_to_melspec, mel_to_waveform
 
 
 METADATA_FILENAME = "/home/skang/Documents/kaggle/bird_clef/data_raw/metadata.toml"
@@ -32,22 +34,22 @@ META_DATA_FILENAME = DOWNLOADED_DIRNAME / "train_metadata.csv"
 AUDIO_DIR = DOWNLOADED_DIRNAME / "train_audio"
 SPLIT_FILENAME = DOWNLOADED_DIRNAME / "traintest_filename.json"
 
-PROCESSED_DATA_DIRNAME = BaseDataModule.data_dirname() / "processed" / "birdclef2022"
+PROCESSED_DATA_DIRNAME = BaseDataModule.data_dirname() / "processed" / "birdclef2022" / Config.version
 ESSENTIALS_FILENAME = (
-    BaseDataModule.data_dirname() / "processed" / "birdclef2022" / "birdclef2022.json"
+    PROCESSED_DATA_DIRNAME / "birdclef2022.json"
 )
 
 
-SAMPLE_RATE = 32000
-N_FFT = 4096
-N_MELS = 256
+SAMPLE_RATE = Config.sr
+N_FFT = Config.n_fft
+N_MELS = Config.n_mels
 
-WIN_LENGTH = None
-HOP_LENGTH = 512
+WIN_LENGTH = Config.win_length
+HOP_LENGTH = Config.hop_length
 
-MIN_SEC = 5
-F_MIN = 1000
-F_MAX = 16000
+MIN_SEC = Config.min_sec
+F_MIN = Config.f_min
+F_MAX = Config.f_max
 
 TRAIN_FRAC = 0.8
 
@@ -74,7 +76,8 @@ class BirdClef2022(BaseDataModule):
         self.f_min = self.args.get("f_min", F_MIN)
         self.f_max = self.args.get("f_max", F_MAX)
 
-        self.mel_converter = self._get_mel_converter()
+        self.mel_converter = waveform_to_melspec
+        self.inverse_mel_converter = mel_to_waveform
 
         if not os.path.exists(ESSENTIALS_FILENAME):
             self.prepare_data()
@@ -122,24 +125,6 @@ class BirdClef2022(BaseDataModule):
         self.dims = tuple(torch.load(PROCESSED_DATA_DIRNAME / "trainval" / "0.pt").shape)
         self.output_dims = len(self.mapping)
 
-    def _get_mel_converter(self):
-        mel_converter = T.MelSpectrogram(
-            sample_rate=self.sr,
-            n_fft=self.n_fft,
-            win_length=self.win_length,
-            hop_length=self.hop_length,
-            center=True,
-            f_min=self.f_min,
-            f_max=self.f_max,
-            pad_mode="reflect",
-            power=2.0,
-            norm="slaney",
-            onesided=True,
-            n_mels=self.n_mels,
-            mel_scale="htk",
-        )
-
-        return mel_converter
 
     def prepare_data(self):
 
@@ -151,21 +136,32 @@ class BirdClef2022(BaseDataModule):
         if os.path.exists(ESSENTIALS_FILENAME) and os.path.exists(SPLIT_FILENAME):
             return
 
-        meta_train, meta_test = get_split_by_bird(self.meta_df)
+        if not os.path.exists(DOWNLOADED_DIRNAME / "test"):
+            
+            if not os.path.exists(PROCESSED_DATA_DIRNAME):
+                os.makedirs(PROCESSED_DATA_DIRNAME)
+                
+            bird_label = list(self.meta_df["primary_label"].unique())
+            essentials = {"birds": bird_label}
+            
+            with open(ESSENTIALS_FILENAME, "w") as f:
+                json.dump(essentials, f)
+            
+            meta_train, meta_test = get_split_by_bird(self.meta_df)
 
-        traintest_filename = {
-            "trainval": list(meta_train.filename),
-            "test": list(meta_test.filename),
-        }
+            traintest_filename = {
+                "trainval": list(meta_train.filename),
+                "test": list(meta_test.filename),
+            }
 
-        with open(SPLIT_FILENAME, "w") as f:
-            json.dump(traintest_filename, f)
+            with open(SPLIT_FILENAME, "w") as f:
+                json.dump(traintest_filename, f)
 
-        with open(SPLIT_FILENAME) as f:
-            self.split_names = json.load(f)
+            with open(SPLIT_FILENAME) as f:
+                self.split_names = json.load(f)
 
-        for meta, stage in zip([meta_train, meta_test], ["trainval", "test"]):
-            copy_split_audio(meta, root_dir=str(DOWNLOADED_DIRNAME), stage=stage)
+            for meta, stage in zip([meta_train, meta_test], ["trainval", "test"]):
+                copy_split_audio(meta, root_dir=str(DOWNLOADED_DIRNAME), stage=stage)
 
         for stage in ["trainval", "test"]:
             _save_mel_labels_essentials(
@@ -178,7 +174,7 @@ class BirdClef2022(BaseDataModule):
 
     def setup(self, stage: Optional[str] = None) -> None:
 
-        if stage == "trainval" or stage is None:
+        if stage == "fit" or stage is None:
 
             data_trainval = BaseDataset(self.processed_filepath_trainval, self.labels_trainval)
             self.data_train, self.data_val = split_dataset(
@@ -214,7 +210,7 @@ class BirdClef2022(BaseDataModule):
 
     @staticmethod
     def add_to_argparse(parser):
-
+        parser = BaseDataModule.add_to_argparse(parser)
         parser.add_argument("--n_mels", type=int, default=N_MELS, help="n_mels")
         parser.add_argument("--n_fft", type=int, default=N_FFT, help="n_fft")
         parser.add_argument("--sr", type=int, default=SAMPLE_RATE, help="sampling rate")
@@ -247,14 +243,12 @@ def _save_mel_labels_essentials(
 
     Args:
         df (pd.DataFrame): 오디오 파일 metadata
-    """
-    if not os.path.exists(PROCESSED_DATA_DIRNAME):
-        os.makedirs(PROCESSED_DATA_DIRNAME)
-    bird_label = list(df["primary_label"].unique())
-    essentials = {"birds": bird_label, "sample_rate": sample_rate}
-    with open(ESSENTIALS_FILENAME, "w") as f:
-        json.dump(essentials, f)
-
+    """    
+    
+    with open(ESSENTIALS_FILENAME) as f:
+        essentials = json.load(f)
+    bird_label = essentials['birds']
+    
     data_index = 0
     label_list = []
 
@@ -319,13 +313,9 @@ def _audio_to_mel_label(
     waveform, wav_len = repeat_crop_waveform(waveform, min_sec_proc, wav_len)
 
     for index in range(int(wav_len / min_sec_proc)):
-        log_melspec = torch.log10(
-            mel_converter(
+        log_melspec = mel_converter(
                 waveform[0, index * min_sec_proc : index * min_sec_proc + min_sec_proc]
-            ).unsqueeze(0)
-            + 1e-10
-        )  # 5초마다 자르기
-        log_melspec = normalize_std(log_melspec)
+            )
 
         if not os.path.exists(PROCESSED_DATA_DIRNAME / stage):
             os.makedirs(PROCESSED_DATA_DIRNAME / stage)
@@ -339,7 +329,7 @@ def _audio_to_mel_label(
 
 def repeat_crop_waveform(waveform: torch.tensor, min_sec_proc, wav_len) -> torch.tensor:
     """
-    정해진 길이만큼 오디오를 반복한후 자른다.
+    정해진 길이보다 오디오가 짧다면 정해진 길이만큼 오디오를 반복한후 자른다.
     
     Args:
         waveform(torch.tensor): 오디오 파일의 waveform
@@ -393,18 +383,6 @@ def to_mono(waveform: torch.tensor):
     
     """
     return torch.mean(waveform, axis=0)
-
-
-def normalize_std(spec):
-    """_summary_
-
-    Args:
-        spec (_type_): _description_
-
-    Returns:
-        _type_: _description_
-    """
-    return (spec - torch.mean(spec)) / torch.std(spec)
 
 
 if __name__ == "__main__":

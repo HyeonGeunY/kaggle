@@ -8,7 +8,7 @@ from typing import Collection, Dict, Optional, Tuple, Union
 
 from birdclef.data.util import BaseDataset
 
-BATCH_SIZE = 32
+BATCH_SIZE = 2
 NUM_WORKERS = 0
 
 
@@ -89,7 +89,7 @@ class BaseDataModule(pl.LightningDataModule):
         dataset의 중요 세팅들 반환, instantiate models에 전달되는 값
         """
 
-        return {"input_dims": self.dims, "output_dims": self.output_dims, "mapping": self.mapping}
+        return {"input_dims": self.dims, "output_dims": self.output_dims, "mapping": self.mapping, "sampling_rate": self.sr}
 
     def prepare_data(self, *args, **kwrags):
         """
