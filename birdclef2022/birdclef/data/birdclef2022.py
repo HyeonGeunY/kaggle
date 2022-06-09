@@ -247,7 +247,7 @@ def _save_mel_labels_essentials(
     
     with open(ESSENTIALS_FILENAME) as f:
         essentials = json.load(f)
-    bird_label = essentials['birds']
+    bird_label = np.array(essentials['birds'])
     
     data_index = 0
     label_list = []

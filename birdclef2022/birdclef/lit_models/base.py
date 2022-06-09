@@ -141,7 +141,7 @@ class BaseLitModel(pl.LightningModule):
             output_birds = outputs_valid[i] > self.threshold
             pred_birds = ", ".join([self.mapping[j] for j in range(len(output_birds))
                                                             if output_birds[j] == True])
-            label_birds = ", ".join([self.mapping[j] for j in range(len(y))
+            label_birds = ", ".join([self.mapping[j] for j in range(len(output_birds))
                                                             if y[i][j] == True])
             # waveform_x = mel_to_waveform(x[i])
             
@@ -149,7 +149,7 @@ class BaseLitModel(pl.LightningModule):
             # sf.write(temp_path, waveform_x, Config.sr)
             try:
                 # audio = wandb.Audio(str(temp_path), sample_rate=Config.sr)
-                spec = wandb.Image(x[i], caption=pred_birds)
+                spec = wandb.Image(x[i])
                 # self.wandb_table_valid.add_data(audio, spec, pred_birds, label_birds)
                 self.wandb_table_valid.add_data(spec, pred_birds, label_birds)
                 # self.logger.experiment.log({"val_pred_examples": [wandb.Image(x[i], caption=pred_birds]})
@@ -168,16 +168,16 @@ class BaseLitModel(pl.LightningModule):
         
         for i in range(1):
             output_birds = outputs_valid[i] > self.threshold
-            pred_birds = ", ".join([self.mapping[i] for i in range(len(output_birds))
-                                                            if output_birds[i] == True])
-            label_birds = ", ".join([self.mapping[i] for i in range(len(y))
-                                                            if y[i] == True])
+            pred_birds = ", ".join([self.mapping[j] for j in range(len(output_birds))
+                                                            if output_birds[j] == True])
+            label_birds = ", ".join([self.mapping[j] for j in range(len(output_birds))
+                                                            if y[i][j] == True])
             # waveform_x = mel_to_waveform(x[i])
             # temp_path = AUDIO_TEMP_DIR / "temp.wav"
             # sf.write(temp_path, waveform_x, Config.sr)
             try:
                 #audio = wandb.Audio(str(temp_path), sample_rate=Config.sr)
-                spec = wandb.Image(x[i], caption=pred_birds)
+                spec = wandb.Image(x[i])
                 # self.wandb_table_test.add_data(audio, spec, pred_birds, label_birds)
                 self.wandb_table_test.add_data(spec, pred_birds, label_birds)
                 # self.logger.experiment.log({"val_pred_examples": [wandb.Image(x[i], caption=pred_birds]})
