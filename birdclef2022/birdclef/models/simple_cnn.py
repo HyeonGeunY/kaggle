@@ -10,7 +10,7 @@ CONV_DIM = 64
 FC_DIM = 128
 H_SPEC = 128
 W_SPEC = 313
-
+ 
 class ConvBlock(nn.Module):
     """
     input과 ouput의 이미지 크기가 동일한 CNN block (padding==1, stride==1, kernel_size==3)
@@ -63,7 +63,7 @@ class SimpleCNN(nn.Module):
         self.fc2 = nn.Linear(fc_dim, self.num_classes)
         
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor):
         """
         Args:
             x (torch.Tensor): input tensor size가 반드시 H_SPEC, W_SPEC과 일치해야 한다. (B, C, H, W)

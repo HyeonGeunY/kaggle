@@ -1,6 +1,8 @@
-input/
+input
 **/wandb_api
 **/wandb
 **/*.bin
 **/__pycache__
-venv
+venv/
+wandb/
+**/logs
