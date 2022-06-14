@@ -4,6 +4,9 @@ import shutil
 import os
 from typing import List
 from sklearn.model_selection import StratifiedShuffleSplit
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 def torch_fix_seed(seed=42):
@@ -110,3 +113,29 @@ def get_output_size_of_cnn(
         w_out /= pool
 
     return int(h_out), int(w_out)
+
+
+def show_heatmap(df, save_dir=None):
+    # make heatmap
+    heatmap = []
+
+    for idx, row in df.iterrows():
+        _, _, species, sec = row.row_id.split("_")
+        if sec == "5":
+            sec = "05"
+        true_or_false = row.target
+        heatmap.append([species,sec,true_or_false])
+    
+    heatmap = pd.DataFrame(heatmap, columns=["species", "sec", "True_or_False"])
+
+    # show heamap
+    fig, ax = plt.subplots(figsize=(10,5))
+    cmap = sns.color_palette("Blues")
+    heatmap = heatmap.pivot("species", "sec", "True_or_False")
+    sns.heatmap(heatmap,ax=ax,linecolor='k',lw=1,cmap=cmap)
+    plt.title("Prediction result in soundscape_453028782.ogg")
+    
+    if save_dir:
+        plt.savefig(os.path.join(save_dir, "inference_heatmap" + "." + "png"))
+    else:
+        plt.show()
