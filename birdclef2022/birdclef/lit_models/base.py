@@ -65,13 +65,13 @@ class BaseLitModel(pl.LightningModule):
 
         self.out_sigmoid = nn.Sigmoid()
 
-        # try:
-        # #     # self.wandb_table_valid = wandb.Table(columns=['Audio', 'mel_spec', 'predict', 'label'])
-        # #     # self.wandb_table_test = wandb.Table(columns=['Audio', 'mel_spec', 'predict', 'label'])
-        #     self.wandb_table_valid = wandb.Table(columns=['mel_spec', 'predict', 'label'])
-        #     self.wandb_table_test = wandb.Table(columns=['mel_spec', 'predict', 'label'])
-        # except AttributeError:
-        #     pass
+        try:
+        #     # self.wandb_table_valid = wandb.Table(columns=['Audio', 'mel_spec', 'predict', 'label'])
+        #     # self.wandb_table_test = wandb.Table(columns=['Audio', 'mel_spec', 'predict', 'label'])
+        #    self.wandb_table_valid = wandb.Table(columns=['mel_spec', 'predict', 'label'])
+            self.wandb_table_test = wandb.Table(columns=['mel_spec', 'predict', 'label'])
+        except AttributeError:
+            pass
 
         if not os.path.exists(AUDIO_TEMP_DIR):
             os.makedirs(AUDIO_TEMP_DIR)
@@ -167,10 +167,10 @@ class BaseLitModel(pl.LightningModule):
         self.test_acc(logits, y.to(dtype=torch.int32))
         self.log("test_acc", self.test_acc, on_step=False, on_epoch=True)
 
-        outputs_valid = self.out_sigmoid(logits)
+        outputs_test = self.out_sigmoid(logits)
 
-        for i in range(1):
-            output_birds = outputs_valid[i] > self.threshold
+        for i in range(len(outputs_test)):
+            output_birds = outputs_test[i] > self.threshold
             pred_birds = ", ".join(
                 [self.mapping[j] for j in range(len(output_birds)) if output_birds[j] == True]
             )
@@ -182,11 +182,11 @@ class BaseLitModel(pl.LightningModule):
             # sf.write(temp_path, waveform_x, Config.sr)
             try:
                 # wandb_table_test = wandb.Table(columns=['mel_spec', 'predict', 'label'])
-                # spec = wandb.Image(x[i])
-                # wandb_table_test.add_data(spec, pred_birds, label_birds)
+                spec = wandb.Image(x[i])
+                self.wandb_table_test.add_data(spec, pred_birds, label_birds)
                 # self.wandb_table_test.add_data(audio, spec, pred_birds, label_birds)
                 # self.logger.experiment.log({"val_pred_examples": [wandb.Image(x[i], caption=pred_birds]})
                 #wandb.log({"test_pred_examples": wandb_table_test})
-                wandb.log({"test_pred": [wandb.Image(x[i], caption=f"pred:\n {pred_birds} \n\n label:\n {label_birds}")]})
+                #wandb.log({"test_pred": [wandb.Image(x[i], caption=f"pred:\n {pred_birds} \n\n label:\n {label_birds}")]})
             except AttributeError:
                 pass

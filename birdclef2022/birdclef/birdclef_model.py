@@ -17,7 +17,7 @@ import torch.nn as nn
 from birdclef.data import BirdClef2022
 from birdclef.lit_models import BaseLitModel
 from birdclef.models import ResNetBird
-from birdclef.data.birdclef2022 import _audio_to_mel_label
+from birdclef.data.augmentation_v1 import _audio_to_mel_label
 from birdclef.util import show_heatmap
 
 

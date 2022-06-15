@@ -1,0 +1,2 @@
+birdclef/artifacts/v1_birdclef/model.pt filter=lfs diff=lfs merge=lfs -text
+birdclef/artifacts/v1_birdclef/* filter=lfs diff=lfs merge=lfs -text

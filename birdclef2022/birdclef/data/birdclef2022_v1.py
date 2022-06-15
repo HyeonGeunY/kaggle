@@ -1,3 +1,7 @@
+if '__file__' in globals():
+    import os, sys
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+    
 import sys
 
 import argparse
@@ -12,10 +16,6 @@ import tqdm
 import toml
 
 import torch
-import torchaudio
-import torchaudio.transforms as T
-
-import librosa.feature as F
 
 from birdclef.data.base_data_module import (
     BaseDataModule,
@@ -24,20 +24,20 @@ from birdclef.data.base_data_module import (
 )
 from birdclef.data.util import BaseDataset, split_dataset
 from birdclef.util import normalize_std, get_split_by_bird, copy_split_audio
-from birdclef.data.augmentation_v1 import Config, waveform_to_melspec, mel_to_waveform
+from birdclef.data.augmentation_v1 import Config, waveform_to_melspec, mel_to_waveform, make_essentials, _audio_to_mel_label, _save_mel_labels_essentials, repeat_crop_waveform
 
-
-METADATA_FILENAME = "/home/skang/Documents/kaggle/bird_clef/data_raw/metadata.toml"
+METADATA_FILENAME = BaseDataModule.data_dirname() / ".." / "data_raw" / "metadata.toml"
 ZIPFILE_PATH = BaseDataModule.data_dirname() / "birdclef-2022.zip"
 DOWNLOADED_DIRNAME = BaseDataModule.data_dirname() / "birdclef-2022"
 META_DATA_FILENAME = DOWNLOADED_DIRNAME / "train_metadata.csv"
 AUDIO_DIR = DOWNLOADED_DIRNAME / "train_audio"
-SPLIT_FILENAME = DOWNLOADED_DIRNAME / "traintest_filename.json"
 
 PROCESSED_DATA_DIRNAME = (
     BaseDataModule.data_dirname() / "processed" / "birdclef2022" / Config.version
 )
+SPLIT_FILENAME = PROCESSED_DATA_DIRNAME / "traintest_filename.json"
 ESSENTIALS_FILENAME = PROCESSED_DATA_DIRNAME / "birdclef2022.json"
+SCORED_BIRDS_FILENAME = DOWNLOADED_DIRNAME / "scored_birds.json"
 
 
 SAMPLE_RATE = Config.sr
@@ -54,7 +54,7 @@ F_MAX = Config.f_max
 TRAIN_FRAC = 0.8
 
 
-class BirdClef2022(BaseDataModule):
+class BirdClef2022_v1(BaseDataModule):
     """Birdclef2022 데이터셋 생성
 
     Args:
@@ -64,6 +64,8 @@ class BirdClef2022(BaseDataModule):
     def __init__(self, args: argparse.Namespace = None):
         super().__init__(args)
         self.meta_df = pd.read_csv(META_DATA_FILENAME)
+        if "test" in Config.version:
+            self.meta_df = self.meta_df[:100]
         self.meta_df["filepath"] = str(AUDIO_DIR) + "/" + self.meta_df["filename"]
 
         self.n_mels = self.args.get("n_mels", N_MELS)
@@ -125,6 +127,7 @@ class BirdClef2022(BaseDataModule):
         self.dims = tuple(torch.load(PROCESSED_DATA_DIRNAME / "trainval" / "0.pt").shape)
         self.output_dims = len(self.mapping)
 
+
     def prepare_data(self):
 
         if not os.path.exists(ZIPFILE_PATH):
@@ -135,16 +138,11 @@ class BirdClef2022(BaseDataModule):
         if os.path.exists(ESSENTIALS_FILENAME) and os.path.exists(SPLIT_FILENAME):
             return
 
-        if not os.path.exists(DOWNLOADED_DIRNAME / "test"):
-
-            if not os.path.exists(PROCESSED_DATA_DIRNAME):
-                os.makedirs(PROCESSED_DATA_DIRNAME)
-
-            bird_label = list(self.meta_df["primary_label"].unique())
-            essentials = {"birds": bird_label}
-
-            with open(ESSENTIALS_FILENAME, "w") as f:
-                json.dump(essentials, f)
+        if not os.path.exists(PROCESSED_DATA_DIRNAME):
+            os.makedirs(PROCESSED_DATA_DIRNAME)
+            make_essentials(self.meta_df)
+            
+        if not os.path.exists(PROCESSED_DATA_DIRNAME / "test"):
 
             meta_train, meta_test = get_split_by_bird(self.meta_df)
 
@@ -235,172 +233,5 @@ class BirdClef2022(BaseDataModule):
         }
 
 
-def _save_mel_labels_essentials(
-    df: pd.DataFrame, stage, min_sec_proc, mel_converter, sample_rate=32000
-):
-    """audio data를 mel spectrogram으로 변환한 후 5초 간격으로 나누어서 저장.
-
-    Args:
-        df (pd.DataFrame): 오디오 파일 metadata
-    """
-
-    with open(ESSENTIALS_FILENAME) as f:
-        essentials = json.load(f)
-    bird_label = np.array(essentials["birds"])
-
-    data_index = 0
-    label_list = []
-
-    for i in range(len(df)):
-        data_index = _audio_to_mel_label(
-            df["filepath"].iloc[i],
-            min_sec_proc,
-            sample_rate,
-            mel_converter,
-            stage,
-            data_index,
-            label_list,
-            bird_label,
-            [df["primary_label"].iloc[i]] + eval(df["secondary_labels"].iloc[i]),
-        )
-
-    torch.save(np.stack(label_list), PROCESSED_DATA_DIRNAME / stage / "label_list.pt")
-
-
-def _audio_to_mel_label(
-    filepath,
-    min_sec_proc,
-    sample_rate,
-    mel_converter,
-    stage="trainval",
-    data_index=0,
-    label_list=[],
-    bird_label=[],
-    label_file=[],
-    mel_list=[],
-    is_test=False
-):
-    """오디오 파일을 mel spectrogram으로 변환 후 5초 간격으로 잘라서 저장
-
-    Args:
-        filepath (str): 오디오 파일 경로
-        min_sec_proc (int): 자를 간격(5초) * sample rate
-        sample_rate (int): 1초에 측정한 샘플 수
-        mel_converter (torch.transform): mel_converter
-        data_index (int, optional): 파일이름(인덱스). Defaults to 0.
-        label_list (list, optional): 각 음원 파일 별 label 정보(target). Defaults to [].
-        bird_label (list, optional): 전체 타겟 클래스 정보. Defaults to [].
-        label_file (list, optional): 각 파일에 들어있는 타겟 정보. Defaults to [].
-
-    Returns:
-        _type_: _description_
-    """
-    if not is_test:
-        label_file_all = np.zeros(len(bird_label))
-        for label_file_temp in label_file:
-            label_file_all += label_file_temp == bird_label
-        label_file_all = np.clip(label_file_all, 0, 1)
-
-        waveform, sample_rate_file = torchaudio.load(filepath=filepath)
-
-        if sample_rate_file != sample_rate:
-            resample = T.Resample(sample_rate_file, sample_rate)
-            waveform = resample(waveform)
-
-        wav_len = waveform.shape[1]
-        waveform = to_mono(waveform)
-        waveform = waveform.reshape(1, wav_len)
-
-        waveform, wav_len = repeat_crop_waveform(waveform, min_sec_proc, wav_len)
-
-        for index in range(int(wav_len / min_sec_proc)):
-            log_melspec = mel_converter(
-                waveform[0, index * min_sec_proc : index * min_sec_proc + min_sec_proc]
-            )
-
-            if not os.path.exists(PROCESSED_DATA_DIRNAME / stage):
-                os.makedirs(PROCESSED_DATA_DIRNAME / stage)
-
-            torch.save(log_melspec, PROCESSED_DATA_DIRNAME / stage / (str(data_index) + ".pt"))
-            label_list.append(label_file_all)
-            data_index += 1
-
-        return data_index
-
-    else:
-        waveform, sample_rate_file = torchaudio.load(filepath=filepath)
-        wav_len = waveform.shape[1]
-        waveform = waveform[0,:].reshape(1, wav_len) # stereo->mono mono->mono
-        
-        waveform, wav_len = repeat_crop_waveform(waveform, min_sec_proc * 12, wav_len)
-        
-        for index in range(int(wav_len/min_sec_proc)):
-            log_melspec = mel_converter(
-                waveform[0, index * min_sec_proc : index * min_sec_proc + min_sec_proc]
-            )
-            
-            mel_list.append(log_melspec)
-            
-        return mel_list
-
-
-def repeat_crop_waveform(waveform: torch.tensor, min_sec_proc, wav_len) -> torch.tensor:
-    """
-    정해진 길이보다 오디오가 짧다면 정해진 길이만큼 오디오를 반복한후 자른다.
-
-    Args:
-        waveform(torch.tensor): 오디오 파일의 waveform
-        min_sec : 최소 시간
-    """
-
-    if wav_len < min_sec_proc:
-        for _ in range(round(min_sec_proc / wav_len)):
-            waveform = torch.cat((waveform, waveform[:, 0:wav_len]), 1)
-        wav_len = min_sec_proc
-        waveform = waveform[:, 0:wav_len]
-
-    return waveform, wav_len
-
-
-def pad_audio(self, audio):
-    """_summary_
-
-    Args:
-        audio (_type_): _description_
-
-    Returns:
-        _type_: _description_
-    """
-    pad_length = self.num_samples - audio.shape[0]
-    last_dim_padding = (0, pad_length)
-    audio = F.pad(audio, last_dim_padding)
-    return audio
-
-
-def crop_audio(self, audio):
-    """_summary_
-
-    Args:
-        audio (_type_): _description_
-
-    Returns:
-        _type_: _description_
-    """
-    return audio[: self.num_samples]
-
-
-def to_mono(waveform: torch.tensor):
-    """다채널 waveform을 mono로 만들어준다.
-
-    Args:
-        waveform(torch.tensor): waveform (N_channel, samples)
-
-    returns:
-        torch.tensor: waveform (1, samples)
-
-    """
-    return torch.mean(waveform, axis=0)
-
-
 if __name__ == "__main__":
-    load_and_print_info(BirdClef2022)
+    load_and_print_info(BirdClef2022_v1)
