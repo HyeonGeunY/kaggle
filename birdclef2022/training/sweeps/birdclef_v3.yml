@@ -1,0 +1,33 @@
+command:
+  - C:\Users\ftmlab\Documents\hyoon\project_new\kaggle\birdclef2022\venv\Scripts\python.exe
+  - ${program}
+  - "--wandb"
+  - ${args}
+  - "--oversampling"
+program: training/run_experiment.py
+method: random
+metric:
+  goal: minimize
+  name: val_loss
+early_terminate:
+  type: hyperband
+  min_iter: 5
+parameters:
+  embedding_size:
+    values: [512, 1024, 2048]
+  lr:
+    values: [0.001, 0.0001]
+  num_workers:
+    value: 4
+  gpus:
+    value: "0,"
+  data_class:
+    value: BirdClef2022_v3
+  model_class:
+    value: ResNetBird
+  batch_size:
+    value: 64
+  check_val_every_n_epoch:
+    value: 5
+  max_epochs:
+    value: 40

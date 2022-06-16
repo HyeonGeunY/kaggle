@@ -8,8 +8,8 @@ from typing import Collection, Dict, Optional, Tuple, Union
 
 from birdclef.data.util import BaseDataset
 
-BATCH_SIZE = 2
-NUM_WORKERS = 0
+BATCH_SIZE = 32
+NUM_WORKERS = 4
 
 
 def load_and_print_info(data_module_class) -> None:
