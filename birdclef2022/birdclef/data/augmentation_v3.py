@@ -1,4 +1,5 @@
 import librosa.feature as F
+import soundfile as sf
 import torch
 import json
 import pandas as pd
@@ -13,7 +14,7 @@ from birdclef.data.util import crop_audio, pad_audio, to_mono, repeat_crop_wavef
 
 
 class Config:
-    version = "v2"
+    version = "v3"
     sr = 32000
     n_fft = 4096
     n_mels = 256
@@ -74,16 +75,12 @@ def normalize_std(spec):
     return (spec - torch.mean(spec)) / torch.std(spec)
 
 
-def make_essentials(df=None):
-    
-    with open(SCORED_BIRDS_FILENAME) as f:
-        essentials = json.load(f)
-    
-    essentials = essentials + ["others"]
-    essentials = {"birds": essentials}
+def make_essentials(df):
+    bird_label = list(df["primary_label"].unique()) + ["others"]
+    essentials = {"birds": bird_label}
 
     with open(ESSENTIALS_FILENAME, "w") as f:
-        json.dump(essentials, f) 
+        json.dump(essentials, f)
 
 
 def _save_mel_labels_essentials(
@@ -97,6 +94,9 @@ def _save_mel_labels_essentials(
 
     with open(ESSENTIALS_FILENAME) as f:
         essentials = json.load(f)
+        
+    with open(SCORED_BIRDS_FILENAME) as f:
+        scored_birds = json.load(f)
     bird_label = np.array(essentials["birds"])
 
     meta_df = pd.DataFrame(columns=["filename", "label"])
@@ -110,6 +110,8 @@ def _save_mel_labels_essentials(
             stage,
             bird_label,
             [df["primary_label"].iloc[i]] + eval(df["secondary_labels"].iloc[i]),
+            df["primary_label"].iloc[i],
+            scored_birds,
             is_test=False,
             meta_df=meta_df
         )
@@ -124,6 +126,8 @@ def _audio_to_mel_label(
     stage="trainval",
     bird_label=None,
     label_file=None,
+    primary_label=None,
+    scored_birds=None,
     mel_list=None,
     is_test=False,
     meta_df=None
@@ -147,13 +151,13 @@ def _audio_to_mel_label(
         if not isinstance(bird_label, np.ndarray):
             bird_label = np.array(bird_label)
         
-        b_name = "others"
+        b_name = primary_label
         label_file_all = np.zeros(len(bird_label))
         for label_file_temp in label_file:
             label_file_all += label_file_temp == bird_label
             
-            if (label_file_temp == bird_label).sum() > 0:
-                b_name = bird_label[label_file_temp == bird_label].item()
+            if not (primary_label in scored_birds) and (label_file_temp in scored_birds):
+                b_name = label_file_temp
         
         if label_file_all.sum() == 0:
             label_file_all[-1] = 1
@@ -182,6 +186,7 @@ def _audio_to_mel_label(
             
             spec_name = str(uuid.uuid4())
             torch.save(log_melspec, PROCESSED_DATA_DIRNAME / stage / b_name / (spec_name + ".pt"))
+            sf.write(PROCESSED_DATA_DIRNAME / stage / b_name / (spec_name + ".wav"), waveform[0, index * min_sec_proc : index * min_sec_proc + min_sec_proc], sample_rate_file)
             row = pd.DataFrame([[b_name + "/" + spec_name + ".pt", str(list(label_file_all))]], columns=["filename", "label"])
             meta_df = pd.concat([meta_df, row], axis=0, ignore_index=True)
             
@@ -212,10 +217,10 @@ def oversampling(df, frac=None):
     df["bird_name"] = df.filename.map(lambda x: x.split("/")[0])
     
     if frac is None:
-        frac = max(len(df.bird_name.unique()) - 1, 1)
-        frac = 1 / frac
+        frac = max(len(df.bird_name.unique()), 1)
+        frac = 21 / frac 
     
-    sampling_num = int(len(df[df.bird_name == "others"]) * frac)
+    sampling_num = int(max(df["bird_name"].value_counts()) * frac)
     birds = df.bird_name.unique()
     df_new = df
     for b in birds:

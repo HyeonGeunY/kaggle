@@ -57,7 +57,7 @@ class BaseDataset(torch.utils.data.Dataset):
         if self.target_transform is not None:
             target = self.target_transform(target)
 
-        return datum, target
+        return datum, target, self.data_path[index].rsplit(".", 1)[0]
 
 
 def split_dataset(

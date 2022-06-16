@@ -1,4 +1,5 @@
 import argparse
+from cProfile import label
 import os
 import pytorch_lightning as pl
 import torch
@@ -8,15 +9,17 @@ from torchmetrics import F1Score
 import soundfile as sf
 
 import numpy as np
+import json
 
 from birdclef.data.base_data_module import BaseDataModule
-from birdclef.data.augmentation_v1 import mel_to_waveform, Config
+
+DOWNLOADED_DIRNAME = BaseDataModule.data_dirname() / "birdclef-2022"
+SCORED_BIRDS_FILENAME = DOWNLOADED_DIRNAME / "scored_birds.json"
 
 AUDIO_TEMP_DIR = BaseDataModule.data_dirname() / "audio_tmp"
 
 try:
     import wandb
-
 except ModuleNotFoundError:
     pass
 
@@ -38,6 +41,7 @@ class BaseLitModel(pl.LightningModule):
         self.model = model
         self.args = vars(args) if args is not None else {}
         self.mapping = self.model.data_config["mapping"]
+        self.sr = self.model.data_config["sampling_rate"]
 
         optimizer = self.args.get("optimizer", OPTIMIZER)
 
@@ -52,6 +56,9 @@ class BaseLitModel(pl.LightningModule):
 
         self.one_cycle_max_lr = self.args.get("one_cycle_max_lr", None)
         self.one_cycle_total_steps = self.args.get("one_cycle_total_steps", ONE_CYCLE_TOTAL_STEPS)
+        
+        with open(SCORED_BIRDS_FILENAME) as f:
+            self.scored_birds = json.load(f)
 
         self.train_acc = F1Score(
             num_classes=self.model.num_classes, average="weighted", threshold=self.threshold
@@ -66,10 +73,20 @@ class BaseLitModel(pl.LightningModule):
         self.out_sigmoid = nn.Sigmoid()
 
         try:
+            score_columns = []
+            exist_pred_columns = []
+            exist_label_columns = []
+            for m in self.mapping:
+                score_columns.append(f"{m}_score")
+                exist_pred_columns.append(f"{m}_exist_pred")
+                exist_label_columns.append(f"{m}_exist_label")
+            table_columns = ['audio', 'mel_spec', 'predict', 'label'] + score_columns + exist_pred_columns + exist_label_columns
         #     # self.wandb_table_valid = wandb.Table(columns=['Audio', 'mel_spec', 'predict', 'label'])
         #     # self.wandb_table_test = wandb.Table(columns=['Audio', 'mel_spec', 'predict', 'label'])
         #    self.wandb_table_valid = wandb.Table(columns=['mel_spec', 'predict', 'label'])
-            self.wandb_table_test = wandb.Table(columns=['mel_spec', 'predict', 'label'])
+            # self.wandb_table_test_v1 = wandb.Table(columns=['mel_spec', 'predict', 'label'])
+            self.wandb_table_test = wandb.Table(columns=table_columns)
+        
         except AttributeError:
             pass
 
@@ -118,7 +135,7 @@ class BaseLitModel(pl.LightningModule):
         return self.model(x)
 
     def training_step(self, batch, batch_idx):
-        x, y = batch
+        x, y, _ = batch
         logits = self(x)  # forward 매소드 호출
         loss = self.loss_fn(logits, y)
         self.log("train_loss", loss)
@@ -128,23 +145,30 @@ class BaseLitModel(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x, y = batch
+        x, y, _ = batch
         logits = self(x)
         loss = self.loss_fn(logits, y)
         self.log("val_loss", loss, prog_bar=True)
         self.val_acc(logits, y.to(dtype=torch.int32))
         self.log("val_acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
 
-        outputs_valid = self.out_sigmoid(logits)
+        outputs_valid = self.out_sigmoid(logits.detach())
 
         for i in range(1):
             output_birds = outputs_valid[i] > self.threshold
+            
+            if output_birds.sum() == 0:
+                output_birds[outputs_valid[i].argmax()] = True
+                
             pred_birds = ", ".join(
                 [self.mapping[j] for j in range(len(output_birds)) if output_birds[j] == True]
             )
             label_birds = ", ".join(
                 [self.mapping[j] for j in range(len(output_birds)) if y[i][j] == True]
             )
+            
+            if not label_birds:
+                label_birds = "other_birds"
             # waveform_x = mel_to_waveform(x[i])
 
             # temp_path = AUDIO_TEMP_DIR / "temp.wav"
@@ -162,28 +186,44 @@ class BaseLitModel(pl.LightningModule):
                 pass
 
     def test_step(self, batch, batch_idx):
-        x, y = batch
+        x, y, path = batch
         logits = self(x)
         self.test_acc(logits, y.to(dtype=torch.int32))
         self.log("test_acc", self.test_acc, on_step=False, on_epoch=True)
 
-        outputs_test = self.out_sigmoid(logits)
+        outputs_test = self.out_sigmoid(logits.detach())
 
         for i in range(len(outputs_test)):
             output_birds = outputs_test[i] > self.threshold
-            pred_birds = ", ".join(
-                [self.mapping[j] for j in range(len(output_birds)) if output_birds[j] == True]
-            )
-            label_birds = ", ".join(
-                [self.mapping[j] for j in range(len(output_birds)) if y[i][j] == True]
-            )
+            
+            if output_birds.sum() == 0:
+                output_birds[outputs_test[i].argmax()] = True
+                
+            pred_birds = [self.mapping[j] for j in range(len(output_birds)) if output_birds[j] == True]
+            label_birds =  [self.mapping[j] for j in range(len(output_birds)) if y[i][j] == True]
+            label_exists = [y[i][j] == True for j in range(len(output_birds))]
+            
+            if not path[i].rsplit("/")[-2] in self.scored_birds:
+                continue
+            
+            # for b in self.scored_birds:
+            #     if b in pred_birds or b in label_birds:
+            #         b_in_pred_or_label = True
+            #         break
+            
+            # if not b_in_pred_or_label:
+            #     continue
+            
             # waveform_x = mel_to_waveform(x[i])
             # temp_path = AUDIO_TEMP_DIR / "temp.wav"
             # sf.write(temp_path, waveform_x, Config.sr)
             try:
                 # wandb_table_test = wandb.Table(columns=['mel_spec', 'predict', 'label'])
                 spec = wandb.Image(x[i])
-                self.wandb_table_test.add_data(spec, pred_birds, label_birds)
+                audio = wandb.Audio(path[i] + '.wav', self.sr)
+                # self.wandb_table_test.add_data(spec, pred_birds, label_birds)
+                self.wandb_table_test.add_data(audio, spec, pred_birds, label_birds, *outputs_test[i], *output_birds, *label_exists)
+                    
                 # self.wandb_table_test.add_data(audio, spec, pred_birds, label_birds)
                 # self.logger.experiment.log({"val_pred_examples": [wandb.Image(x[i], caption=pred_birds]})
                 #wandb.log({"test_pred_examples": wandb_table_test})

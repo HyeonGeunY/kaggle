@@ -18,7 +18,7 @@ class ResNetBird(nn.Module):
         
         self.data_config = data_config
         self.input_dims = data_config["input_dims"]
-        self.num_classes = len(data_config["mapping"])
+        self.num_classes = data_config["output_dims"]
         
         embedding_size = self.args.get("embedding_size", EMBEDDING_SIZE)
         

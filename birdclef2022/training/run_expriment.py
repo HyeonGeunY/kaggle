@@ -161,6 +161,7 @@ def main():
     trainer.test(lit_model, datamodule=data)
     if args.wandb:
         wandb.log({"test_pred_examples": lit_model.wandb_table_test})
+        # wandb.log({"test_pred_examples_v2": lit_model.wandb_table_test_v2})
     
     best_model_path = model_checkpoint_callback.best_model_path
     if best_model_path:

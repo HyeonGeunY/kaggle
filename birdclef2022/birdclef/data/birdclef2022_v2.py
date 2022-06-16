@@ -6,7 +6,7 @@ import sys
 
 import argparse
 from pathlib import Path
-from typing import Dict, Optional, Sequence, Tuple
+from typing import Optional
 import json
 import numpy as np
 import pandas as pd
@@ -24,7 +24,7 @@ from birdclef.data.base_data_module import (
 )
 from birdclef.data.util import BaseDataset, split_dataset
 from birdclef.util import normalize_std, get_split_by_bird, copy_split_audio
-from birdclef.data.augmentation_v2 import Config, waveform_to_melspec, mel_to_waveform, make_essentials, _audio_to_mel_label, _save_mel_labels_essentials, repeat_crop_waveform
+from birdclef.data.augmentation_v2 import Config, waveform_to_melspec, mel_to_waveform, make_essentials, _save_mel_labels_essentials, oversampling
 
 METADATA_FILENAME = BaseDataModule.data_dirname() / ".." / "data_raw" / "metadata.toml"
 ZIPFILE_PATH = BaseDataModule.data_dirname() / "birdclef-2022.zip"
@@ -53,6 +53,7 @@ F_MAX = Config.f_max
 
 TRAIN_FRAC = 0.8
 
+OS_FRAC = None
 
 class BirdClef2022_v2(BaseDataModule):
     """Birdclef2022 데이터셋 생성
@@ -77,6 +78,9 @@ class BirdClef2022_v2(BaseDataModule):
         self.min_sec_proc = self.sr * self.min_sec
         self.f_min = self.args.get("f_min", F_MIN)
         self.f_max = self.args.get("f_max", F_MAX)
+        
+        self.oversampling = self.args.get("oversampling", False)
+        self.os_frac = self.args.get("os_frac", OS_FRAC)
 
         self.mel_converter = waveform_to_melspec
         self.inverse_mel_converter = mel_to_waveform
@@ -95,8 +99,8 @@ class BirdClef2022_v2(BaseDataModule):
         self.test_meta = pd.read_csv(PROCESSED_DATA_DIRNAME / "test" / f"{Config.version}_meta.csv")
         self.test_meta["filepath"] = str(PROCESSED_DATA_DIRNAME) + "/" + "test" + "/" + self.test_meta["filename"]
 
-        self.labels_trainval = self.trainval_meta.label.map(lambda x: np.array(eval(x)))
-        self.labels_test = self.test_meta.label.map(lambda x: np.array(eval(x)))
+        self.trainval_meta.label = self.trainval_meta.label.map(lambda x: np.array(eval(x)))
+        self.test_meta.label = self.test_meta.label.map(lambda x: np.array(eval(x)))
 
         self.mapping = list(essentials["birds"])
         self.inverse_mapping = {
@@ -153,16 +157,19 @@ class BirdClef2022_v2(BaseDataModule):
 
         if stage == "fit" or stage is None:
             
-            # sampling 
+            trainval_meta = self.trainval_meta
             
-            data_trainval = BaseDataset(self.trainval_meta.filepath, self.labels_trainval)
+            if self.oversampling:
+                trainval_meta = oversampling(trainval_meta)
+            
+            data_trainval = BaseDataset(trainval_meta.filepath, trainval_meta.label)
             self.data_train, self.data_val = split_dataset(
                 base_dataset=data_trainval, fraction=TRAIN_FRAC, seed=2022
             )
 
         if stage == "test" or stage is None:
 
-            self.data_test = BaseDataset(self.test_meta.filepath, self.labels_test)
+            self.data_test = BaseDataset(self.test_meta.filepath, self.test_meta.label)
 
     def __repr__(self) -> str:
         """Print info about the dataset."""
@@ -175,8 +182,8 @@ class BirdClef2022_v2(BaseDataModule):
         if self.data_train is None and self.data_val is None and self.data_test is None:
             return basic
 
-        x, y = next(iter(self.train_dataloader()))
-        xt, yt = next(iter(self.test_dataloader()))
+        x, y, _ = next(iter(self.train_dataloader()))
+        xt, yt, _ = next(iter(self.test_dataloader()))
 
         data = (
             f"Train/val/test sizes: {len(self.data_train)}, {len(self.data_val)}, {len(self.data_test)}\n"
@@ -198,6 +205,8 @@ class BirdClef2022_v2(BaseDataModule):
         parser.add_argument("--min_sec", type=int, default=MIN_SEC, help="음악 샘플을 나눌 간격(5초)")
         parser.add_argument("--f_min", type=int, default=F_MIN, help="min_frequency of mel spec")
         parser.add_argument("--f_max", type=int, default=F_MAX, help="max_frequency of mel spec")
+        parser.add_argument("--os_frac", type=float, default=OS_FRAC, help="fraction of oversampling")
+        parser.add_argument("--oversampling", action="store_true", default=False)
 
         return parser
 

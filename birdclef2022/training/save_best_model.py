@@ -105,7 +105,7 @@ def _copy_local_model_checkpoint(run_id: str, project: str, output_dirname: Path
 
 def _get_artifacts_dirname(trained_data_class: str) -> Path:
     """Return artifacts dirname."""
-    for keyword in ["v2"]:
+    for keyword in ["v1", "v2", "v3"]:
         if keyword in trained_data_class.lower():
             artifacts_dirname = ARTIFACTS_BASE_DIRNAME / f"{keyword}_birdclef"
             artifacts_dirname.mkdir(parents=True, exist_ok=True)
