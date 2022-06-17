@@ -1,0 +1,32 @@
+# AGGREGATIONS
+BUREAU_AGG = {
+    'SK_ID_BUREAU': ['nunique'],
+    'DAYS_CREDIT': ['min', 'max', 'mean'],
+    'DAYS_CREDIT_ENDDATE': ['min', 'max'],
+    'AMT_CREDIT_MAX_OVERDUE': ['max', 'mean'],
+    'AMT_CREDIT_SUM': ['max', 'mean', 'sum'],
+    'AMT_CREDIT_SUM_DEBT': ['max', 'mean', 'sum'],
+    'AMT_CREDIT_SUM_OVERDUE': ['max', 'mean', 'sum'],
+    'AMT_ANNUITY': ['mean'],
+    'DEBT_CREDIT_DIFF': ['mean', 'sum'],
+    'MONTHS_BALANCE_MEAN': ['mean', 'var'],
+    'MONTHS_BALANCE_SIZE': ['mean', 'sum'],
+    # Categorical
+    'STATUS_0': ['mean'],
+    'STATUS_1': ['mean'],
+    'STATUS_12345': ['mean'],
+    'STATUS_C': ['mean'],
+    'STATUS_X': ['mean'],
+    'CREDIT_ACTIVE_Active': ['mean'],
+    'CREDIT_ACTIVE_Closed': ['mean'],
+    'CREDIT_ACTIVE_Sold': ['mean'],
+    'CREDIT_TYPE_Consumer credit': ['mean'],
+    'CREDIT_TYPE_Credit card': ['mean'],
+    'CREDIT_TYPE_Car loan': ['mean'],
+    'CREDIT_TYPE_Mortgage': ['mean'],
+    'CREDIT_TYPE_Microloan': ['mean'],
+    # Group by loan duration features (months)
+    'LL_AMT_CREDIT_SUM_OVERDUE': ['mean'],
+    'LL_DEBT_CREDIT_DIFF': ['mean'],
+    'LL_STATUS_12345': ['mean'],
+}
