@@ -4,7 +4,6 @@ if "__file__" in globals():
     
 
 from pathlib import Path
-from typing import Sequence, Union
 import argparse
 import json
 import numpy as np
@@ -14,15 +13,15 @@ from PIL import Image
 import torch
 import torch.nn as nn
 
-from birdclef.data import BirdClef2022
+from birdclef.data import BirdClef2022_v3
 from birdclef.lit_models import BaseLitModel
 from birdclef.models import ResNetBird
-from birdclef.data.augmentation_v1 import _audio_to_mel_label
+from birdclef.data.augmentation_v3 import _audio_to_mel_label
 from birdclef.util import show_heatmap
 
 
 CONFIG_AND_WEIGHTS_DIRNAME = (
-    Path(__file__).resolve().parent / "artifacts" / "v1_birdclef"
+    Path(__file__).resolve().parent / "artifacts" / "v3_birdclef"
 )
 
 DATA_DIRNAME = Path(__file__).resolve().parents[1] / "input"
@@ -30,11 +29,11 @@ SCORED_BIRD_FILENAME = DATA_DIRNAME / "birdclef-2022" / "scored_birds.json"
 SUBMISSION_DIR = Path(__file__).resolve().parents[1] / "submission"
 
 
-class BirdClef2022_v1:
-    """Birdclef model trained by v1 data"""
+class BirdClef2022:
+    """Birdclef model trained by v3 data"""
 
     def __init__(self):
-        data = BirdClef2022()
+        data = BirdClef2022_v3()
         self.mapping = np.array(data.mapping)  # 기존 mapping에 "\n"가 추가되어 있는 mapping
         self.min_sec_proc = data.min_sec_proc
         self.out_sigmoid = nn.Sigmoid()
@@ -84,14 +83,11 @@ class BirdClef2022_v1:
                 chunk_end_time = (i + 1) * 5
                 
                 output_birds = outputs_test[idx] > thres
-        
                 pred_birds = ", ".join(
                     [self.mapping[j] for j in range(len(output_birds)) if output_birds[j] == True]
-                )
+                    )
                 pred_birds_list.append(pred_birds)
-                
                 for bird in self.scored_birds:
-                    
                     try:
                         score = outputs_test[idx][np.where(self.mapping==bird)]
                     except IndexError:
@@ -128,8 +124,8 @@ def main():
     parser.add_argument("test_audio_dir", type=str)
     args = parser.parse_args()
 
-    text_recognizer = BirdClef2022_v1()
-    pred_str = text_recognizer.predict(Path(args.test_audio_dir))
+    birdclef = BirdClef2022()
+    pred_str = birdclef.predict(Path(args.test_audio_dir))
     print(pred_str)
 
 

@@ -104,15 +104,16 @@ def _copy_local_model_checkpoint(run_id: str, project: str, output_dirname: Path
 
 
 def _get_artifacts_dirname(trained_data_class: str) -> Path:
-    """Return artifacts dirname."""
+    # """Return artifacts dirname."""
+    
     for keyword in ["v1", "v2", "v3"]:
-        if keyword in trained_data_class.lower():
+        if keyword in str(trained_data_class).lower():
             artifacts_dirname = ARTIFACTS_BASE_DIRNAME / f"{keyword}_birdclef"
             artifacts_dirname.mkdir(parents=True, exist_ok=True)
             break
         
         else:
-            artifacts_dirname = ARTIFACTS_BASE_DIRNAME / f"v1_birdclef"
+            artifacts_dirname = ARTIFACTS_BASE_DIRNAME / f"v3_birdclef"
             artifacts_dirname.mkdir(parents=True, exist_ok=True)
             break
             
@@ -154,7 +155,7 @@ def _setup_parser():
 
     parser.add_argument("--entity", type=str, default="hgyoon0928")
     parser.add_argument("--project", type=str, default="birdclef2022")
-    parser.add_argument("--trained_data_class", type=str, default="BirdClef2022")
+    parser.add_argument("--trained_data_class", type=str, default="BirdClef2022_v3")
     parser.add_argument("--metric", type=str, default="val_loss")
     parser.add_argument("--mode", type=str, default="min")
     
